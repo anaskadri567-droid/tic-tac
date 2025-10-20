@@ -30,7 +30,7 @@ export const minikitConfig = {
     primaryCategory: "social",
     tags: ["game", "tic-tac-toe", "ai", "strategy", "competitive"],
     heroImageUrl: `${ROOT_URL}/blue-hero.png`, 
-    tagline: "Beat the AI & Cast",
+    tagline: "Beat the AI and Cast",
     ogTitle: "Tic-Tac-Toe",
     ogDescription: "Play strategic tic-tac-toe against a smart AI and share your winning streaks with friends!",
     ogImageUrl: `${ROOT_URL}/blue-hero.png`,
