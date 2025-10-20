@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { sdk } from "@farcaster/miniapp-sdk";
 import styles from "./page.module.css";
 
 // Declare minikit type inline to avoid compilation issues
@@ -34,6 +35,29 @@ export default function Home() {
   });
   const [isPlayerTurn, setIsPlayerTurn] = useState(true);
   const [error, setError] = useState("");
+  const [isAppReady, setIsAppReady] = useState(false);
+
+  // Initialize MiniApp SDK
+  useEffect(() => {
+    const initializeMiniApp = async () => {
+      try {
+        // Wait for the app to be fully loaded
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Signal that the app is ready to display
+        await sdk.actions.ready();
+        
+        setIsAppReady(true);
+        console.log('MiniApp initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize MiniApp:', error);
+        // Set ready anyway for non-MiniApp environments
+        setIsAppReady(true);
+      }
+    };
+
+    initializeMiniApp();
+  }, []);
 
   // Load stats from localStorage
   useEffect(() => {
@@ -202,31 +226,51 @@ export default function Home() {
     
     const statsText = `\n\n📊 My Battle Stats:\n🏆 Wins: ${stats.playerWins}\n🤖 AI Wins: ${stats.computerWins}\n⚖️ Draws: ${stats.draws}\n📈 Win Rate: ${winRate}%\n🎮 Total Games: ${stats.gamesPlayed}`;
     
-    const appLink = `\n\n� Think you can beat the AI? Challenge it here: ${window.location.origin}`;
+    const appLink = `\n\n🎯 Think you can beat the AI? Challenge it here!`;
     
     const castText = gameResultText + statsText + appLink;
 
     try {
-      // Use MiniKit to post cast
-      if (window.minikit) {
-        await window.minikit.cast({
-          text: castText,
-          embeds: [{ url: window.location.origin }]
-        });
-        alert("🎉 Game result shared successfully!");
+      setError(""); // Clear any existing errors
+
+      // Create the proper Warpcast compose URL
+      const baseUrl = 'https://warpcast.com/~/compose';
+      const params = new URLSearchParams({
+        'text': castText,
+        'embeds[]': window.location.origin
+      });
+      const composeUrl = `${baseUrl}?${params.toString()}`;
+
+      // Use the Farcaster MiniApp SDK to open cast composer
+      if (sdk?.actions?.openUrl) {
+        console.log('Opening compose URL:', composeUrl);
+        
+        await sdk.actions.openUrl(composeUrl);
+        
+        console.log('Cast composer opened successfully');
+        
       } else {
-        // Fallback - show cast text for manual posting
-        navigator.clipboard.writeText(castText);
-        alert(`Cast copied to clipboard! 📋\n\nPaste this in Warpcast:\n\n${castText}`);
+        // Non-MiniApp fallback - try to open in new window
+        console.log('Fallback: opening compose URL in new window');
+        
+        const newWindow = window.open(composeUrl, '_blank', 'noopener,noreferrer');
+        
+        if (!newWindow) {
+          throw new Error("Popup blocked - please allow popups for this site");
+        }
       }
+      
     } catch (error) {
-      console.error("Failed to post cast:", error);
-      // Fallback - copy to clipboard
+      console.error("Failed to share cast:", error);
+      
+      // Fallback - copy to clipboard with better user feedback
       try {
-        navigator.clipboard.writeText(castText);
-        setError("Couldn't auto-post. Cast copied to clipboard - paste it in Warpcast!");
-      } catch {
-        setError("Failed to share result. Please try again.");
+        await navigator.clipboard.writeText(castText + `\n\nGame: ${window.location.origin}`);
+        setError("📋 Cast text copied to clipboard! Open Warpcast to paste and share your result.");
+      } catch (clipboardError) {
+        console.error("Clipboard failed:", clipboardError);
+        // Show the text so user can manually copy
+        setError(`❌ Copy this text to share on Warpcast:\n\n${castText}\n\nGame: ${window.location.origin}`);
       }
     }
   }, [gameStatus, stats]);
@@ -257,6 +301,21 @@ export default function Home() {
       </button>
     );
   };
+
+  // Show loading screen while MiniApp is initializing
+  if (!isAppReady) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.content}>
+          <div className={styles.gameContainer}>
+            <h1 className={styles.title}>Tic-Tac-Toe vs Computer</h1>
+            <p className={styles.subtitle}>Loading game...</p>
+            <div className={styles.gameStatus}>🎮 Getting ready to play!</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>
